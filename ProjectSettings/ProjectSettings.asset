@@ -755,7 +755,7 @@ PlayerSettings:
     QNX: 1
     Stadia: 1
     VisionOS: 1
-    WebGL: 1
+    WebGL: 4
     Windows Store Apps: 1
     XboxOne: 1
     iPhone: 1
@@ -773,7 +773,7 @@ PlayerSettings:
   m_RenderingPath: 1
   m_MobileRenderingPath: 1
   metroPackageName: unity-gas-station-demo
-  metroPackageVersion: 
+  metroPackageVersion: 1.0.0.0
   metroCertificatePath: 
   metroCertificatePassword: 
   metroCertificateSubject: 
@@ -781,7 +781,7 @@ PlayerSettings:
   metroCertificateNotAfter: 0000000000000000
   metroApplicationDescription: unity-gas-station-demo
   wsaImages: {}
-  metroTileShortName: 
+  metroTileShortName: unity-gas-station-demo
   metroTileShowName: 0
   metroMediumTileShowName: 0
   metroLargeTileShowName: 0

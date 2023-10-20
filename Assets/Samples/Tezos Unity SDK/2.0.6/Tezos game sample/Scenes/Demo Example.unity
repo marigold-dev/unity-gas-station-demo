@@ -1183,8 +1183,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   contractAddress: KT1PLpZWTFfL6J191XqFazgfSX4tyc2iuFVE
-  gasStationUrl: https://gas-station.marigold.dev
+  gasStationUrl: https://gas-station-api.gcp-npr.marigold.dev
   rpcBaseUrl: https://ghostnet.tezos.marigold.dev
+  Network: 1
 --- !u!4 &519783461
 Transform:
   m_ObjectHideFlags: 0

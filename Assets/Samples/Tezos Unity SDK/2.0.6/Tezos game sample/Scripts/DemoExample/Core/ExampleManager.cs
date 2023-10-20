@@ -56,33 +56,32 @@ namespace TezosSDK.Samples.DemoExample
             CurrentUser = null;
         }
 
-        public void FetchInventoryItems(Action<List<IItemModel>> callback)
+        public async void FetchInventoryItems(Action<List<IItemModel>> callback)
         {
             var activeWalletAddress = Tezos.Wallet.GetActiveAddress(); // Address to the current active account
 
             const string entrypoint = "view_items_of";
             var input = new { @string = activeWalletAddress };
 
-            CoroutineRunner.Instance.StartWrappedCoroutine(
-                Tezos.API.ReadView(
-                    contractAddress: contractAddress,
-                    entrypoint: entrypoint,
-                    input: JsonSerializer.Serialize(input, JsonOptions.DefaultOptions),
-                    callback: result =>
-                    {
-                        Logger.LogDebug("READING INVENTORY DATA");
+            await Tezos.API.ReadView(
+                contractAddress: contractAddress,
+                entrypoint: entrypoint,
+                input: JsonSerializer.Serialize(input, JsonOptions.DefaultOptions),
+                callback: result =>
+                {
+                    Logger.LogDebug("READING INVENTORY DATA");
 
-                        // deserialize the json data to inventory items
-                        CoroutineRunner.Instance.StartWrappedCoroutine(
-                            NetezosExtensions.HumanizeValue(
-                                val: result,
-                                rpcUri: _networkRPC,
-                                destination: contractAddress,
-                                humanizeEntrypoint: "humanizeInventory",
-                                onComplete: (ContractInventoryViewResult[] inventory) =>
-                                    OnInventoryFetched(inventory, callback))
-                        );
-                    }));
+                    // deserialize the json data to inventory items
+                    CoroutineRunner.Instance.StartWrappedCoroutine(
+                        NetezosExtensions.HumanizeValue(
+                            val: result,
+                            rpcUri: _networkRPC,
+                            destination: contractAddress,
+                            humanizeEntrypoint: "humanizeInventory",
+                            onComplete: (ContractInventoryViewResult[] inventory) =>
+                                OnInventoryFetched(inventory, callback))
+                    );
+                });
         }
 
         private void OnInventoryFetched(ContractInventoryViewResult[] inventory, Action<List<IItemModel>> callback)
@@ -146,7 +145,7 @@ namespace TezosSDK.Samples.DemoExample
             public ContractItem item { get; set; }
         }
 
-        public void FetchMarketItems(Action<List<IItemModel>> callback)
+        public async void FetchMarketItems(Action<List<IItemModel>> callback)
         {
             const string entrypoint = "view_items_on_market";
 
@@ -158,24 +157,23 @@ namespace TezosSDK.Samples.DemoExample
                 Prim = PrimType.Unit
             }.ToJson();
 
-            CoroutineRunner.Instance.StartWrappedCoroutine(
-                Tezos.API.ReadView(
-                    contractAddress: contractAddress,
-                    entrypoint: entrypoint,
-                    input: input,
-                    callback: result =>
-                    {
-                        // deserialize the json data to market items
-                        CoroutineRunner.Instance.StartWrappedCoroutine(
-                            NetezosExtensions.HumanizeValue(
-                                val: result,
-                                rpcUri: _networkRPC,
-                                destination: contractAddress,
-                                humanizeEntrypoint: "humanizeMarketplace",
-                                onComplete: (ContractMarketplaceViewResult[] market) =>
-                                    OnMarketplaceFetched(market, callback))
-                        );
-                    }));
+            await Tezos.API.ReadView(
+                contractAddress: contractAddress,
+                entrypoint: entrypoint,
+                input: input,
+                callback: result =>
+                {
+                    // deserialize the json data to market items
+                    CoroutineRunner.Instance.StartWrappedCoroutine(
+                        NetezosExtensions.HumanizeValue(
+                            val: result,
+                            rpcUri: _networkRPC,
+                            destination: contractAddress,
+                            humanizeEntrypoint: "humanizeMarketplace",
+                            onComplete: (ContractMarketplaceViewResult[] market) =>
+                                OnMarketplaceFetched(market, callback))
+                    );
+                });
         }
 
         private void OnMarketplaceFetched(ContractMarketplaceViewResult[] market, Action<List<IItemModel>> callback)
@@ -214,19 +212,9 @@ namespace TezosSDK.Samples.DemoExample
             callback?.Invoke(dummyItemList);
         }
 
-        public void BuyItem(string owner, int itemID)
+        public async void BuyItem(string owner, int itemID)
         {
             const string entryPoint = "buy";
-
-            // var parameter = new MichelinePrim
-            // {
-            //     Prim = PrimType.Pair,
-            //     Args = new List<IMicheline>
-            //     {
-            //         new MichelineString(owner),
-            //         new MichelineInt(itemID)
-            //     }
-            // }.ToJson();
 
             var sender = Tezos.Wallet.GetActiveAddress();
             
@@ -245,33 +233,45 @@ namespace TezosSDK.Samples.DemoExample
                 Value = paramValue
             };
 
-            // Logger.LogDebug(contractAddress + " " + entryPoint + parameter);
-            // Tezos.Wallet.CallContract(contractAddress, entryPoint, parameter, 0);
-
             var destination = contractAddress;
-            var routine = GasStation.PostOperations<object>(owner, new List<Operation>() {
+            var result = await GasStation.PostOperations<object>(sender, new List<Operation>() {
                 new() {
                  destination = destination,
                  parameters = param 
                 }
             });
-            CoroutineRunner.Instance.StartWrappedCoroutine(routine);
-           
-#if UNITY_IOS || UNITY_ANDROID
-            Application.OpenURL("tezos://");
-#endif
+
+            Logger.LogDebug(result.ToString());
         }
 
-        public void MintItem()
+        public async void MintItem()
         {
-            const string entrypoint = "mint";
-            const string input = "{\"prim\": \"Unit\"}";
+            var sender = Tezos.Wallet.GetActiveAddress();
 
-            Tezos.Wallet.CallContract(contractAddress, entrypoint, input, 0);
+            const string entryPoint = "mint";
 
-#if UNITY_IOS || UNITY_ANDROID
-        Application.OpenURL("tezos://");
-#endif
+            var destination = contractAddress;
+
+            var paramValue = Tezos.TokenContract.GetContractScript().BuildParameter(
+                entrypoint: entryPoint,
+                value: sender);
+            
+            var param = new Parameters()
+            {
+                Entrypoint = entryPoint,
+                Value = paramValue
+            };
+
+            var result = await GasStation.PostOperations<object>(sender, new List<Operation>()
+            {
+                new()
+                {
+                 destination = destination,
+                 parameters = param 
+                }
+            });
+
+            Logger.LogDebug(result.ToString());
         }
 
         public void MintFA2(Action<TokenBalance> callback)
@@ -319,7 +319,7 @@ namespace TezosSDK.Samples.DemoExample
             GetSoftBalanceRoutine(callback);
         }
 
-        private void GetSoftBalanceRoutine(Action<int> callback)
+        private async void GetSoftBalanceRoutine(Action<int> callback)
         {
             var caller = Tezos.Wallet.GetActiveAddress();
 
@@ -333,17 +333,16 @@ namespace TezosSDK.Samples.DemoExample
                 }
             }.ToJson();
 
-            CoroutineRunner.Instance.StartWrappedCoroutine(
-                Tezos.API.ReadView(
-                    contractAddress: contractAddress,
-                    entrypoint: "get_balance",
-                    input: input,
-                    callback: result =>
-                    {
-                        var intProp = result.GetProperty("int");
-                        var intValue = Convert.ToInt32(intProp.ToString());
-                        callback(intValue);
-                    }));
+            await Tezos.API.ReadView(
+                contractAddress: contractAddress,
+                entrypoint: "get_balance",
+                input: input,
+                callback: result =>
+                {
+                    var intProp = result.GetProperty("int");
+                    var intValue = Convert.ToInt32(intProp.ToString());
+                    callback(intValue);
+                });
         }
 
         public void TransferItem(int itemID, int amount, string address)
@@ -366,7 +365,7 @@ namespace TezosSDK.Samples.DemoExample
 #endif
         }
 
-        public void AddItemToMarket(int itemID, int price)
+        public async void AddItemToMarket(int itemID, int price)
         {
             Debug.Log("Adding Item " + itemID + " to Market with the price of " + price);
 
@@ -375,42 +374,6 @@ namespace TezosSDK.Samples.DemoExample
             var sender = Tezos.Wallet.GetActiveAddress();
 
             var destination = contractAddress;
-
-            var input = new MichelinePrim
-            {
-                Prim = PrimType.Pair,
-                Args = new List<IMicheline>
-                {
-                    new MichelinePrim
-                    {
-                        Prim = PrimType.Pair,
-                        Args = new List<IMicheline>
-                        {
-                            new MichelineInt(0), // (currency ID = 0) represents coins
-                            new MichelineInt(price),
-                        }
-                    },
-                    new MichelinePrim
-                    {
-                        Prim = PrimType.Pair,
-                        Args = new List<IMicheline>
-                        {
-                            new MichelineString(sender), // (currency ID = 0) represents coins
-                            new MichelineInt(itemID),
-                        }
-                    },
-                    // Add user address
-                    //  
-                }
-            };
-
-            // Assign operation here instead call contract
-            // Tezos.Wallet.CallContract(contractAddress, entryPoint, parameter, 0);
-
-
-            // var paramValue = Tezos.TokenContract.GetContractScript().BuildParameter(
-            //     entrypoint: entryPoint,
-            //     value: input);
 
             var paramValue = Tezos.TokenContract.GetContractScript().BuildParameter(
                 entrypoint: entryPoint,
@@ -422,35 +385,42 @@ namespace TezosSDK.Samples.DemoExample
                     token_id = itemID
                 });
 
-            var param = new Parameters()
+            Debug.Log(paramValue.ToJson());
+
+            var param = new Netezos.Forging.Models.Parameters()
             {
                 Entrypoint = entryPoint,
                 Value = paramValue
             };
 
-            var routine = GasStation.PostOperations<object>(sender, new List<Operation>() {
-                new() {
+            Debug.Log("param " + JsonSerializer.Serialize(param, JsonOptions.DefaultOptions));
+
+            var result = await GasStation.PostOperations<object>(sender, new List<Operation>() {
+                new Operation() {
                  destination = destination,
                  parameters = param 
                 }
             });
-            CoroutineRunner.Instance.StartWrappedCoroutine(routine);
 
-            // Call Gas station API then
-
-#if UNITY_IOS || UNITY_ANDROID
-            Application.OpenURL("tezos://");
-#endif
+            Logger.LogDebug(result.ToString());
         }
 
-        public void RemoveItemFromMarket(int itemID)
+        public async void RemoveItemFromMarket(int itemID)
         {
             Debug.Log("Removing Item " + itemID + " from market.");
 
             const string entryPoint = "removeFromMarket";
 
             var sender = Tezos.Wallet.GetActiveAddress();
-            var parameter = new MichelinePrim
+
+            var destination = contractAddress;
+
+            var value = new {
+                address = sender,
+                token_id = itemID
+            };
+
+            var paramValue = new MichelinePrim
             {
                 Prim = PrimType.Pair,
                 Args = new List<IMicheline>
@@ -458,13 +428,22 @@ namespace TezosSDK.Samples.DemoExample
                     new MichelineString(sender),
                     new MichelineInt(itemID)
                 }
-            }.ToJson();
+            };
 
-            Tezos.Wallet.CallContract(contractAddress, entryPoint, parameter, 0);
+            var param = new Parameters()
+            {
+                Entrypoint = entryPoint,
+                Value = paramValue
+            };
 
-#if UNITY_IOS || UNITY_ANDROID
-            Application.OpenURL("tezos://");
-#endif
+            var result = await GasStation.PostOperations<object>(sender, new List<Operation>() {
+                new() {
+                 destination = destination,
+                 parameters = param 
+                }
+            });
+
+            Logger.LogDebug(result.ToString());
         }
 
         public void DeployContract(Action<string> deployedContractAddress)
@@ -482,7 +461,7 @@ namespace TezosSDK.Samples.DemoExample
 
         public void GetCoins()
         {
-            FetchInventoryItems(list =>
+            FetchInventoryItems(async list =>
             {
 
                 var sender = Tezos.Wallet.GetActiveAddress();
@@ -510,7 +489,7 @@ namespace TezosSDK.Samples.DemoExample
                     Value = paramValue
                 };
 
-                var routine = GasStation.PostOperations<object>(sender, new List<Operation>()
+                var result = await GasStation.PostOperations<object>(sender, new List<Operation>()
                 {
                     new()
                     {
@@ -518,16 +497,12 @@ namespace TezosSDK.Samples.DemoExample
                         parameters = param
                     }
                 });
-                CoroutineRunner.Instance.StartWrappedCoroutine(routine);
-                // Tezos.Wallet.CallContract(contractAddress, entryPoint, parameter, 0);
-
-#if UNITY_IOS || UNITY_ANDROID
-            Application.OpenURL("tezos://");
-#endif
+               
+                Logger.LogDebug(result.ToString());
             });
         }
 
-        public void IsItemOnMarket(int itemID, string owner, Action<bool> callback)
+        public async void IsItemOnMarket(int itemID, string owner, Action<bool> callback)
         {
             const string entrypoint = "is_item_on_market";
 
@@ -541,17 +516,17 @@ namespace TezosSDK.Samples.DemoExample
                 }
             }.ToJson();
 
-            CoroutineRunner.Instance.StartWrappedCoroutine(
-                Tezos.API.ReadView(
-                    contractAddress: contractAddress,
-                    entrypoint: entrypoint,
-                    input: input,
-                    callback: result =>
-                    {
-                        var boolString = result.GetProperty("prim");
-                        var boolVal = boolString.GetString() == "True";
-                        callback?.Invoke(boolVal);
-                    }));
+            await Tezos.API.ReadView(
+                contractAddress: contractAddress,
+                entrypoint: entrypoint,
+                input: input,
+                callback: result =>
+                {
+                    var boolString = result.GetProperty("prim");
+                    var boolVal = boolString.GetString() == "True";
+                    callback?.Invoke(boolVal);
+                }
+            );
         }
 
         public void RequestSignPayload(SignPayloadType signingType, string payload)
